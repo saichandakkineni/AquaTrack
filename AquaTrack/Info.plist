@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.cmobautomation.AquaTrack.refresh</string>
+	</array>
+    <key>NSHealthShareUsageDescription</key>
+        <string>AquaTrack uses HealthKit to read your water intake data and provide accurate hydration tracking.</string>
+    <key>NSHealthUpdateUsageDescription</key>
+        <string>AquaTrack uses HealthKit to log your water intake and help you stay hydrated.</string>
+
+</dict>
+</plist>
