@@ -11,8 +11,16 @@ import SwiftData
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.scenePhase) private var scenePhase
-    @Query private var intakes: [WaterIntake]
+    @Query(sort: \WaterIntake.timestamp, order: .reverse) private var allIntakes: [WaterIntake]
     @Query private var settings: [Settings]
+    
+    // Optimized: Computed property that filters only today's intakes
+    // This is more efficient than filtering all intakes on every render
+    private var todayIntakes: [WaterIntake] {
+        let calendar = Calendar.current
+        let today = Date()
+        return allIntakes.filter { calendar.isDateInToday($0.timestamp) }
+    }
     
     var body: some View {
         TabView {
@@ -24,9 +32,19 @@ struct ContentView: View {
                 Label("Today", systemImage: "drop.fill")
             }
             
+            HourlyBreakdownView()
+                .tabItem {
+                    Label("Hourly", systemImage: "clock.fill")
+                }
+            
             HistoryView()
                 .tabItem {
                     Label("History", systemImage: "chart.bar.fill")
+                }
+            
+            AchievementsView()
+                .tabItem {
+                    Label("Achievements", systemImage: "trophy.fill")
                 }
             
             SettingsView()
@@ -39,14 +57,14 @@ struct ContentView: View {
             case .active:
                 NotificationCenter.default.post(name: .appWillEnterForeground, object: nil)
                 Task {
-                    await WaterIntake.updateSharedDefaults()
+                    await WaterIntake.updateSharedDefaults(context: modelContext)
                 }
             case .inactive:
                 try? modelContext.save()
             case .background:
                 try? modelContext.save()
                 Task {
-                    await WaterIntake.updateSharedDefaults()
+                    await WaterIntake.updateSharedDefaults(context: modelContext)
                 }
             @unknown default:
                 break
@@ -56,12 +74,9 @@ struct ContentView: View {
             if settings.isEmpty {
                 let defaultSettings = Settings()
                 modelContext.insert(defaultSettings)
+                try? modelContext.save()
             }
         }
-    }
-    
-    private var todayIntakes: [WaterIntake] {
-        intakes.filter { Calendar.current.isDateInToday($0.timestamp) }
     }
 }
 

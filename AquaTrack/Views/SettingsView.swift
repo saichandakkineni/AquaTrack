@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var dailyGoal: Double = 2000
     @State private var reminderEnabled: Bool = false
     @State private var reminderInterval: Int = 60
+    @State private var selectedUnit: WaterUnit = .milliliters
     
     private var currentSettings: Settings {
         if let first = settings.first {
@@ -25,16 +26,35 @@ struct SettingsView: View {
             Form {
                 Section("Daily Goal") {
                     Stepper {
-                        Text("\(Int(dailyGoal))ml per day")
+                        Text("\(formatDailyGoal()) per day")
                     } onIncrement: {
+                        // dailyGoal is always stored in ml, so just add 100ml
                         dailyGoal += 100
                         updateDailyGoal()
                     } onDecrement: {
+                        // dailyGoal is always stored in ml, so just subtract 100ml
+                        // Minimum goal is 100ml
                         if dailyGoal > 100 {
                             dailyGoal -= 100
                             updateDailyGoal()
                         }
                     }
+                }
+                
+                Section("Units") {
+                    Picker("Display Unit", selection: $selectedUnit) {
+                        ForEach(WaterUnit.allCases, id: \.self) { unit in
+                            Text(unit.displayName).tag(unit)
+                        }
+                    }
+                    .onChange(of: selectedUnit) { _, newValue in
+                        currentSettings.unit = newValue
+                        try? modelContext.save()
+                    }
+                    
+                    Text("All values will be displayed in \(selectedUnit.displayName)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
                 
                 Section("Reminders") {
@@ -78,6 +98,7 @@ struct SettingsView: View {
                 dailyGoal = currentSettings.dailyGoal
                 reminderEnabled = currentSettings.reminderEnabled
                 reminderInterval = currentSettings.reminderInterval
+                selectedUnit = currentSettings.unit
             }
         }
     }
@@ -109,7 +130,12 @@ struct SettingsView: View {
         currentSettings.dailyGoal = dailyGoal
         try? modelContext.save()
         Task {
-            await WaterIntake.updateSharedDefaults()
+            await WaterIntake.updateSharedDefaults(context: modelContext)
         }
+    }
+    
+    private func formatDailyGoal() -> String {
+        let goalInSelectedUnit = WaterUnit.convert(dailyGoal, from: .milliliters, to: selectedUnit)
+        return "\(selectedUnit.format(goalInSelectedUnit)) \(selectedUnit.displayName)"
     }
 } 

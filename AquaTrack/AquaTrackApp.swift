@@ -18,7 +18,7 @@ struct AquaTrackApp: App {
         }
         .modelContainer(appDelegate.container ?? {
             do {
-                return try ModelContainer(for: WaterIntake.self, Settings.self)
+                return try ModelContainer(for: WaterIntake.self, Settings.self, Achievement.self)
             } catch {
                 fatalError("Failed to create ModelContainer: \(error)")
             }

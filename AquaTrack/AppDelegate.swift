@@ -8,7 +8,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
             container = try ModelContainer(
-                for: WaterIntake.self, Settings.self,  // Add Settings to the container
+                for: WaterIntake.self, Settings.self, Achievement.self,
                 configurations: ModelConfiguration(isStoredInMemoryOnly: false)
             )
             
@@ -30,7 +30,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         scheduleAppRefresh()
         saveContext()
         Task {
-            await WaterIntake.updateSharedDefaults()
+            if let container = container {
+                let context = ModelContext(container)
+                await WaterIntake.updateSharedDefaults(context: context)
+            } else {
+                await WaterIntake.updateSharedDefaults()
+            }
         }
     }
     
@@ -68,7 +73,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         
         // Refresh your app's data
         Task {
-            await WaterIntake.updateSharedDefaults()
+            if let container = container {
+                let context = ModelContext(container)
+                await WaterIntake.updateSharedDefaults(context: context)
+            } else {
+                await WaterIntake.updateSharedDefaults()
+            }
             task.setTaskCompleted(success: true)
         }
     }
