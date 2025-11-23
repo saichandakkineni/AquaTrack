@@ -10,6 +10,9 @@ struct SettingsView: View {
     @State private var reminderEnabled: Bool = false
     @State private var reminderInterval: Int = 60
     @State private var selectedUnit: WaterUnit = .milliliters
+    @State private var quietHoursEnabled: Bool = true
+    @State private var quietHoursStart: Int = 22 // 10 PM
+    @State private var quietHoursEnd: Int = 7    // 7 AM
     
     private var currentSettings: Settings {
         if let first = settings.first {
@@ -80,6 +83,57 @@ struct SettingsView: View {
                             try? modelContext.save()
                             scheduleNotifications()
                         }
+                        
+                        Toggle("Quiet Hours", isOn: $quietHoursEnabled)
+                            .onChange(of: quietHoursEnabled) { _, newValue in
+                                currentSettings.quietHoursEnabled = newValue
+                                try? modelContext.save()
+                                scheduleNotifications()
+                            }
+                        
+                        if quietHoursEnabled {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Start")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Picker("", selection: $quietHoursStart) {
+                                        ForEach(0..<24, id: \.self) { hour in
+                                            Text(formatHour(hour)).tag(hour)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .onChange(of: quietHoursStart) { _, newValue in
+                                        currentSettings.quietHoursStart = newValue
+                                        try? modelContext.save()
+                                        scheduleNotifications()
+                                    }
+                                }
+                                
+                                HStack {
+                                    Text("End")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    Spacer()
+                                    Picker("", selection: $quietHoursEnd) {
+                                        ForEach(0..<24, id: \.self) { hour in
+                                            Text(formatHour(hour)).tag(hour)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    .onChange(of: quietHoursEnd) { _, newValue in
+                                        currentSettings.quietHoursEnd = newValue
+                                        try? modelContext.save()
+                                        scheduleNotifications()
+                                    }
+                                }
+                                
+                                Text("No notifications will be sent during quiet hours")
+                                    .font(.caption2)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
                     }
                 }
                 
@@ -99,12 +153,29 @@ struct SettingsView: View {
                 reminderEnabled = currentSettings.reminderEnabled
                 reminderInterval = currentSettings.reminderInterval
                 selectedUnit = currentSettings.unit
+                quietHoursEnabled = currentSettings.quietHoursEnabled
+                quietHoursStart = currentSettings.quietHoursStart
+                quietHoursEnd = currentSettings.quietHoursEnd
             }
         }
     }
     
     private func scheduleNotifications() {
-        NotificationManager.shared.scheduleNotifications(interval: reminderInterval)
+        NotificationManager.shared.scheduleNotifications(
+            interval: reminderInterval,
+            quietHoursEnabled: quietHoursEnabled,
+            quietHoursStart: quietHoursStart,
+            quietHoursEnd: quietHoursEnd
+        )
+    }
+    
+    private func formatHour(_ hour: Int) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "ha"
+        var components = DateComponents()
+        components.hour = hour
+        let date = Calendar.current.date(from: components) ?? Date()
+        return formatter.string(from: date).lowercased()
     }
     
     private func updateReminderSettings(enabled: Bool) {
@@ -118,7 +189,13 @@ struct SettingsView: View {
             DispatchQueue.main.async {
                 if granted {
                     updateReminderSettings(enabled: true)
-                    scheduleNotifications()
+                    // Schedule with current quiet hours settings
+                    NotificationManager.shared.scheduleNotifications(
+                        interval: reminderInterval,
+                        quietHoursEnabled: quietHoursEnabled,
+                        quietHoursStart: quietHoursStart,
+                        quietHoursEnd: quietHoursEnd
+                    )
                 } else {
                     updateReminderSettings(enabled: false)
                 }

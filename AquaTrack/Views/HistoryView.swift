@@ -22,39 +22,84 @@ struct HistoryView: View {
     
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    Chart(weeklyData, id: \.date) { item in
-                        BarMark(
-                            x: .value("Date", item.date, unit: .day),
-                            y: .value("Amount", item.amount)
-                        )
-                        .foregroundStyle(Color.blue.gradient)
-                    }
-                    .frame(height: 200)
-                    .chartXAxis {
-                        AxisMarks(values: .stride(by: .day)) { value in
-                            AxisValueLabel(format: .dateTime.weekday())
-                        }
-                    }
-                } header: {
-                    Text("Last 7 Days")
+            if groupedByDay().isEmpty {
+                // Empty state
+                VStack(spacing: 20) {
+                    Image(systemName: "chart.bar.doc.horizontal")
+                        .font(.system(size: 60))
+                        .foregroundColor(.blue.opacity(0.5))
+                    
+                    Text("No History Yet")
+                        .font(.title2)
+                        .bold()
+                    
+                    Text("Start tracking your water intake to see your hydration history and trends over time.")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    
+                    Text("💡 Tip: Track consistently to unlock achievements and build streaks!")
+                        .font(.caption)
+                        .foregroundColor(.blue)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                        .padding(.top, 10)
                 }
-                
-                Section {
-                    ForEach(groupedByDay(), id: \.date) { day in
-                        VStack(alignment: .leading) {
-                            Text(day.date.formatted(date: .abbreviated, time: .omitted))
-                                .font(.headline)
-                            Text("\(Int(day.amount))ml")
-                                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .navigationTitle("History")
+            } else {
+                List {
+                    Section {
+                        Chart(weeklyData, id: \.date) { item in
+                            BarMark(
+                                x: .value("Date", item.date, unit: .day),
+                                y: .value("Amount", item.amount)
+                            )
+                            .foregroundStyle(Color.blue.gradient)
+                            .cornerRadius(4)
                         }
+                        .frame(height: 200)
+                        .chartXAxis {
+                            AxisMarks(values: .stride(by: .day)) { value in
+                                AxisValueLabel(format: .dateTime.weekday())
+                            }
+                        }
+                        .chartYAxis {
+                            AxisMarks { value in
+                                AxisGridLine()
+                                AxisValueLabel()
+                            }
+                        }
+                    } header: {
+                        Text("Last 7 Days")
+                    } footer: {
+                        Text("Tap a day below to see details")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                     }
-                } header: {
-                    Text("Daily History")
+                    
+                    Section {
+                        ForEach(groupedByDay(), id: \.date) { day in
+                            NavigationLink {
+                                DayDetailView(date: day.date, intakes: intakes.filter { calendar.isDate($0.timestamp, inSameDayAs: day.date) })
+                            } label: {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(day.date.formatted(date: .abbreviated, time: .omitted))
+                                        .font(.headline)
+                                    Text("\(Int(day.amount))ml")
+                                        .foregroundStyle(.secondary)
+                                        .font(.subheadline)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    } header: {
+                        Text("Daily History")
+                    }
                 }
+                .navigationTitle("History")
             }
-            .navigationTitle("History")
         }
     }
     

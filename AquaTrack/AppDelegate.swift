@@ -7,10 +7,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         do {
-            container = try ModelContainer(
-                for: WaterIntake.self, Settings.self, Achievement.self,
-                configurations: ModelConfiguration(isStoredInMemoryOnly: false)
+            let schema = Schema([
+                WaterIntake.self,
+                Settings.self,
+                Achievement.self
+            ])
+            
+            let modelConfiguration = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false
             )
+            
+            container = try ModelContainer(for: schema, configurations: [modelConfiguration])
             
             // Register for background tasks
             BGTaskScheduler.shared.register(
@@ -20,7 +28,18 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
                 self.handleAppRefresh(task: task as! BGAppRefreshTask)
             }
         } catch {
-            print("Failed to create ModelContainer: \(error)")
+            print("Failed to create ModelContainer: \(error.localizedDescription)")
+            // Try to create a new container - this might be a migration issue
+            do {
+                print("Attempting to create ModelContainer with explicit schema...")
+                container = try ModelContainer(
+                    for: WaterIntake.self, Settings.self, Achievement.self,
+                    configurations: ModelConfiguration(isStoredInMemoryOnly: false)
+                )
+            } catch {
+                print("Failed to create ModelContainer on retry: \(error.localizedDescription)")
+                // Container will be nil, and AquaTrackApp will handle it
+            }
         }
         return true
     }

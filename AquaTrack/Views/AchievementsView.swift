@@ -11,6 +11,8 @@ struct AchievementsView: View {
     @State private var longestStreak: Int = 0
     @State private var goalCompletions: Int = 0
     @State private var showingAchievementDetail: Achievement?
+    @State private var unlockedAchievement: Achievement?
+    @State private var showingAchievementCelebration = false
     
     private var dailyGoal: Double {
         settings.first?.dailyGoal ?? 2000
@@ -99,6 +101,11 @@ struct AchievementsView: View {
             .sheet(item: $showingAchievementDetail) { achievement in
                 AchievementDetailView(achievement: achievement)
             }
+            .fullScreenCover(isPresented: $showingAchievementCelebration) {
+                if let achievement = unlockedAchievement {
+                    AchievementCelebrationView(achievement: achievement, isPresented: $showingAchievementCelebration)
+                }
+            }
         }
     }
     
@@ -140,9 +147,20 @@ struct AchievementsView: View {
             )
             
             if !newAchievements.isEmpty {
-                // Refresh the view to show new achievements
-                await MainActor.run {
-                    // Trigger view refresh
+                print("🎉 \(newAchievements.count) new achievement(s) unlocked in AchievementsView!")
+                
+                // Show celebration for the first unlocked achievement
+                if let firstAchievement = newAchievements.first {
+                    print("🎊 Showing celebration for: \(firstAchievement.title)")
+                    
+                    await MainActor.run {
+                        unlockedAchievement = firstAchievement
+                        showingAchievementCelebration = true
+                        print("✅ Celebration state set in AchievementsView - view should appear now")
+                        
+                        // Also send a notification
+                        NotificationManager.shared.sendAchievementNotification(firstAchievement)
+                    }
                 }
             }
         }

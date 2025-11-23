@@ -13,14 +13,14 @@ class AchievementManager {
     ///   - currentStreak: Current streak count
     ///   - goalCompletions: Total number of days goal was met
     ///   - perfectDays: Number of consecutive perfect days
-    /// - Returns: Array of newly unlocked achievement IDs
+    /// - Returns: Array of newly unlocked Achievement objects
     func checkAndUnlockAchievements(
         context: ModelContext,
         currentStreak: Int,
         goalCompletions: Int,
         perfectDays: Int
-    ) -> [String] {
-        var newlyUnlocked: [String] = []
+    ) -> [Achievement] {
+        var newlyUnlocked: [Achievement] = []
         
         // Fetch existing achievements
         let descriptor = FetchDescriptor<Achievement>()
@@ -35,26 +35,32 @@ class AchievementManager {
         let existingIds = Set(existingAchievements.map { $0.id })
         
         // Check streak achievements
-        for achievement in AchievementDefinition.allAchievements where achievement.category == .streak {
-            if !existingIds.contains(achievement.id) && currentStreak >= achievement.requirement {
-                unlockAchievement(achievement, context: context)
-                newlyUnlocked.append(achievement.id)
+        for achievementDef in AchievementDefinition.allAchievements where achievementDef.category == .streak {
+            if !existingIds.contains(achievementDef.id) && currentStreak >= achievementDef.requirement {
+                if let achievement = unlockAchievement(achievementDef, context: context) {
+                    newlyUnlocked.append(achievement)
+                    print("🔥 Streak achievement unlocked: \(achievementDef.title) (streak: \(currentStreak))")
+                }
             }
         }
         
         // Check goal completion achievements
-        for achievement in AchievementDefinition.allAchievements where achievement.category == .goal {
-            if !existingIds.contains(achievement.id) && goalCompletions >= achievement.requirement {
-                unlockAchievement(achievement, context: context)
-                newlyUnlocked.append(achievement.id)
+        for achievementDef in AchievementDefinition.allAchievements where achievementDef.category == .goal {
+            if !existingIds.contains(achievementDef.id) && goalCompletions >= achievementDef.requirement {
+                if let achievement = unlockAchievement(achievementDef, context: context) {
+                    newlyUnlocked.append(achievement)
+                    print("🎯 Goal achievement unlocked: \(achievementDef.title) (completions: \(goalCompletions))")
+                }
             }
         }
         
         // Check consistency achievements
-        for achievement in AchievementDefinition.allAchievements where achievement.category == .consistency {
-            if !existingIds.contains(achievement.id) && perfectDays >= achievement.requirement {
-                unlockAchievement(achievement, context: context)
-                newlyUnlocked.append(achievement.id)
+        for achievementDef in AchievementDefinition.allAchievements where achievementDef.category == .consistency {
+            if !existingIds.contains(achievementDef.id) && perfectDays >= achievementDef.requirement {
+                if let achievement = unlockAchievement(achievementDef, context: context) {
+                    newlyUnlocked.append(achievement)
+                    print("✨ Consistency achievement unlocked: \(achievementDef.title) (perfect days: \(perfectDays))")
+                }
             }
         }
         
@@ -62,7 +68,8 @@ class AchievementManager {
     }
     
     /// Unlocks an achievement
-    private func unlockAchievement(_ definition: AchievementDefinition, context: ModelContext) {
+    /// - Returns: The unlocked Achievement object, or nil if save failed
+    private func unlockAchievement(_ definition: AchievementDefinition, context: ModelContext) -> Achievement? {
         let achievement = Achievement(
             id: definition.id,
             title: definition.title,
@@ -76,9 +83,11 @@ class AchievementManager {
         
         do {
             try context.save()
-            print("Achievement unlocked: \(definition.title)")
+            print("✅ Achievement saved: \(definition.title)")
+            return achievement
         } catch {
-            print("Error saving achievement: \(error.localizedDescription)")
+            print("❌ Error saving achievement: \(error.localizedDescription)")
+            return nil
         }
     }
     

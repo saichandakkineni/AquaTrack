@@ -46,20 +46,30 @@ struct HourlyBreakdownView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     if hourlyData.isEmpty {
-                        VStack(spacing: 10) {
-                            Image(systemName: "chart.bar.xaxis")
-                                .font(.system(size: 50))
-                                .foregroundColor(.secondary)
-                            Text("No intake data for today")
-                                .font(.headline)
-                                .foregroundColor(.secondary)
-                            Text("Start tracking your water intake to see hourly breakdown")
-                                .font(.caption)
+                        VStack(spacing: 20) {
+                            Image(systemName: "drop.circle.fill")
+                                .font(.system(size: 70))
+                                .foregroundColor(.blue.opacity(0.5))
+                            
+                            Text("No Intake Today")
+                                .font(.title2)
+                                .bold()
+                            
+                            Text("Start tracking your water intake to see an hourly breakdown of your hydration throughout the day.")
+                                .font(.body)
                                 .foregroundColor(.secondary)
                                 .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                            
+                            Text("💡 Tip: Track regularly throughout the day for better insights!")
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                                .multilineTextAlignment(.center)
+                                .padding(.horizontal)
+                                .padding(.top, 10)
                         }
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
+                        .padding(.vertical, 60)
                     } else {
                         // Summary Card
                         VStack(alignment: .leading, spacing: 8) {

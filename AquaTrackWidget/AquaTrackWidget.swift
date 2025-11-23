@@ -39,11 +39,15 @@ struct AquaTrackWidgetEntryView: View {
     var body: some View {
         switch family {
         case .systemSmall:
-            CircularProgressView(entry: entry)
+            VStack(spacing: 8) {
+                CircularProgressView(entry: entry)
+                QuickAddButtons(compact: true)
+            }
+            .padding()
         case .systemMedium:
             HStack {
                 CircularProgressView(entry: entry)
-                VStack(alignment: .leading) {
+                VStack(alignment: .leading, spacing: 8) {
                     Text("Today's Progress")
                         .font(.headline)
                     ProgressView(value: entry.intake, total: entry.goal)
@@ -51,14 +55,16 @@ struct AquaTrackWidgetEntryView: View {
                     Text("\(Int(entry.intake))ml of \(Int(entry.goal))ml")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    QuickAddButtons(compact: true)
                 }
                 .padding()
             }
         case .systemLarge:
-            VStack {
+            VStack(spacing: 12) {
                 CircularProgressView(entry: entry)
                     .frame(height: 200)
                 DailyProgressChart(entry: entry)
+                QuickAddButtons(compact: false)
             }
             .padding()
         case .accessoryCircular:
@@ -72,6 +78,43 @@ struct AquaTrackWidgetEntryView: View {
             }
         default:
             CircularProgressView(entry: entry)
+        }
+    }
+}
+
+struct QuickAddButtons: View {
+    let compact: Bool
+    let amounts = [250.0, 500.0, 750.0]
+    
+    var body: some View {
+        if compact {
+            HStack(spacing: 4) {
+                ForEach(amounts, id: \.self) { amount in
+                    Link(destination: URL(string: "aquatrack://add?amount=\(Int(amount))")!) {
+                        Text("+\(Int(amount))")
+                            .font(.caption2)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(Color.blue)
+                            .cornerRadius(6)
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 8) {
+                ForEach(amounts, id: \.self) { amount in
+                    Link(destination: URL(string: "aquatrack://add?amount=\(Int(amount))")!) {
+                        Text("+\(Int(amount))ml")
+                            .font(.subheadline)
+                            .foregroundColor(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(Color.blue)
+                            .cornerRadius(8)
+                    }
+                }
+            }
         }
     }
 }

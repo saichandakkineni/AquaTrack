@@ -9,7 +9,7 @@ class Achievement {
     var achievementDescription: String // Renamed from 'description' to avoid conflict with SwiftData's description property
     var iconName: String
     var earnedDate: Date
-    var category: AchievementCategory
+    var categoryRawValue: String // Store as String for SwiftData compatibility
     
     init(id: String, title: String, description: String, iconName: String, earnedDate: Date = Date(), category: AchievementCategory) {
         self.id = id
@@ -17,7 +17,17 @@ class Achievement {
         self.achievementDescription = description
         self.iconName = iconName
         self.earnedDate = earnedDate
-        self.category = category
+        self.categoryRawValue = category.rawValue
+    }
+    
+    /// Gets the category enum from the stored raw value
+    var category: AchievementCategory {
+        get {
+            AchievementCategory(rawValue: categoryRawValue) ?? .streak
+        }
+        set {
+            categoryRawValue = newValue.rawValue
+        }
     }
 }
 
