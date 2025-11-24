@@ -13,6 +13,11 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Query(sort: \WaterIntake.timestamp, order: .reverse) private var allIntakes: [WaterIntake]
     @Query private var settings: [Settings]
+    @State private var showOnboarding = false
+    
+    private var shouldShowOnboarding: Bool {
+        !UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+    }
     
     // Optimized: Computed property that filters only today's intakes
     // This is more efficient than filtering all intakes on every render
@@ -76,6 +81,17 @@ struct ContentView: View {
                 modelContext.insert(defaultSettings)
                 try? modelContext.save()
             }
+        }
+        .onAppear {
+            // Check onboarding status on appear
+            showOnboarding = shouldShowOnboarding
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showOnboarding)) { _ in
+            // Show onboarding when requested from Settings
+            showOnboarding = true
+        }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView(isPresented: $showOnboarding)
         }
     }
 }

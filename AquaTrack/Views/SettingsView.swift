@@ -141,6 +141,23 @@ struct SettingsView: View {
                     }
                 }
                 
+                Section("About") {
+                    Button(action: {
+                        // Reset onboarding for testing
+                        UserDefaults.standard.removeObject(forKey: "hasCompletedOnboarding")
+                        // Post notification to trigger onboarding
+                        NotificationCenter.default.post(name: .showOnboarding, object: nil)
+                    }) {
+                        HStack {
+                            Text("Show Welcome Screen Again")
+                            Spacer()
+                            Image(systemName: "arrow.clockwise")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .foregroundColor(.primary)
+                }
+                
                 Section("Health Integration") {
                     if checkingHealthKitStatus {
                         HStack {
