@@ -92,5 +92,56 @@ class UsageTracker {
             return 100
         }
     }
+    
+    /// Gets primary quick add amounts (most used, adaptive)
+    /// - Parameter intakes: All water intake records
+    /// - Returns: Array of 3-4 most used amounts, or defaults if no data
+    func getPrimaryAmounts(intakes: [WaterIntake]) -> [Double] {
+        let calendar = Calendar.current
+        let cutoffDate = calendar.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+        
+        // Filter recent intakes
+        let recentIntakes = intakes.filter { $0.timestamp >= cutoffDate && $0.amount > 0 }
+        
+        guard !recentIntakes.isEmpty else {
+            // Default amounts if no usage data
+            return [250.0, 500.0, 750.0]
+        }
+        
+        // Count occurrences of each amount (rounded to nearest 25ml)
+        var amountCounts: [Double: Int] = [:]
+        
+        for intake in recentIntakes {
+            let rounded = round(intake.amount / 25) * 25
+            amountCounts[rounded, default: 0] += 1
+        }
+        
+        // Get top 3-4 most used amounts
+        let sortedAmounts = amountCounts.sorted { $0.value > $1.value }
+        let topAmounts = Array(sortedAmounts.prefix(4).map { $0.key })
+        
+        // If we have at least 3, return them; otherwise pad with defaults
+        if topAmounts.count >= 3 {
+            return Array(topAmounts.prefix(4))
+        } else {
+            let defaults = [250.0, 500.0, 750.0]
+            return Array(Set(topAmounts + defaults).sorted().prefix(4))
+        }
+    }
+    
+    /// Gets time-based suggestion message
+    /// - Parameter hour: Current hour (0-23)
+    /// - Returns: Suggestion message
+    func getTimeBasedSuggestionMessage(hour: Int) -> String {
+        if hour >= 6 && hour < 12 {
+            return "Good morning! Start your day with hydration 💧"
+        } else if hour >= 12 && hour < 18 {
+            return "Afternoon boost! Stay hydrated ☀️"
+        } else if hour >= 18 && hour < 22 {
+            return "Evening hydration for better sleep 🌙"
+        } else {
+            return "Night time - small sips recommended 🌃"
+        }
+    }
 }
 

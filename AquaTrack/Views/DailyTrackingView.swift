@@ -29,8 +29,10 @@ struct DailyTrackingView: View {
     @State private var showingMaxAmountExceededAlert = false
     @State private var attemptedAddAmount: Double = 0
     @State private var showingQuickActionsMenu = false
+    @State private var suggestionDismissedUntil: Date? = nil
     
     private let maxDailyIntake: Double = 10000 // 10 liters maximum per day
+    private let suggestionCooldownHours: Double = 2 // Show suggestion again after 2 hours
     
     private var currentUnit: WaterUnit {
         settings.first?.unit ?? .milliliters
@@ -155,161 +157,135 @@ struct DailyTrackingView: View {
                     showQuickActionsMenu()
                 }
                 
-                // Small Amount Buttons
-                VStack(spacing: 10) {
-                    Text("Quick Add - Small")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    HStack(spacing: 8) {
-                        ForEach(smallAmounts, id: \.self) { amount in
-                            AnimatedButton(hapticStyle: .light) {
-                                addWater(amount: amount)
-                            } label: {
-                                Text("+\(Int(amount))ml")
-                                    .font(.footnote)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.blue.opacity(0.8))
-                                    .cornerRadius(8)
-                            }
-                        }
-                    }
-                    
-                    HStack(spacing: 8) {
-                        ForEach(smallAmounts, id: \.self) { amount in
-                            AnimatedButton(hapticStyle: .light) {
-                                decreaseWater(amount: amount)
-                            } label: {
-                                Text("-\(Int(amount))ml")
-                                    .font(.footnote)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 8)
-                                    .background(Color.red.opacity(0.8))
-                                    .cornerRadius(8)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Standard Amount Buttons
-                VStack(spacing: 10) {
-                    Text("Quick Add - Standard")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    
-                    HStack(spacing: 8) {
-                        ForEach(standardAmounts, id: \.self) { amount in
+                // Primary Quick Add Buttons - Single Adaptive Row
+                let primaryAmounts = UsageTracker.shared.getPrimaryAmounts(intakes: Array(allIntakes))
+                VStack(spacing: 12) {
+                    HStack(spacing: 12) {
+                        ForEach(primaryAmounts.prefix(4), id: \.self) { amount in
                             AnimatedButton(hapticStyle: .medium) {
                                 addWater(amount: amount)
                             } label: {
-                                Text("+\(Int(amount))ml")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.blue)
-                                    .cornerRadius(10)
+                                VStack(spacing: 4) {
+                                    Text("+\(Int(amount))")
+                                        .font(.headline)
+                                        .foregroundColor(.white)
+                                    Text("ml")
+                                        .font(.caption2)
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .background(
+                                    LinearGradient(
+                                        colors: [Color.blue, Color.blue.opacity(0.8)],
+                                        startPoint: .top,
+                                        endPoint: .bottom
+                                    )
+                                )
+                                .cornerRadius(12)
+                                .shadow(color: Color.blue.opacity(0.3), radius: 4, x: 0, y: 2)
                             }
                         }
                     }
                     
-                    HStack(spacing: 8) {
-                        ForEach(standardAmounts, id: \.self) { amount in
-                            AnimatedButton(hapticStyle: .medium) {
-                                decreaseWater(amount: amount)
-                            } label: {
-                                Text("-\(Int(amount))ml")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                                    .background(Color.red)
-                                    .cornerRadius(10)
-                            }
-                        }
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Smart Quick Actions Section
-                if let mostUsed = UsageTracker.shared.getMostUsedAmount(intakes: Array(allIntakes)) {
-                    VStack(spacing: 10) {
-                        Text("Quick Add - Most Used")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        
-                        AnimatedButton(hapticStyle: .medium) {
-                            addWater(amount: mostUsed)
+                    // Secondary Actions Row
+                    HStack(spacing: 12) {
+                        AnimatedButton(hapticStyle: .light) {
+                            showingCustomInput = true
                         } label: {
                             HStack {
-                                Image(systemName: "star.fill")
-                                    .foregroundColor(.yellow)
-                                Text("+\(Int(mostUsed))ml")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
+                                Image(systemName: "plus.circle.fill")
+                                Text("Custom")
                             }
+                            .font(.subheadline)
+                            .foregroundColor(.blue)
                             .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(
-                                LinearGradient(
-                                    colors: [Color.blue, Color.blue.opacity(0.8)],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                )
+                            .padding(.vertical, 12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.blue, lineWidth: 1.5)
                             )
-                            .cornerRadius(12)
                         }
-                    }
-                    .padding(.horizontal)
-                    .padding(.top, 10)
-                }
-                
-                // Recent Amounts Section
-                let recentAmounts = UsageTracker.shared.getRecentAmounts(intakes: Array(allIntakes))
-                if !recentAmounts.isEmpty && recentAmounts.count > 1 {
-                    VStack(spacing: 10) {
-                        Text("Recent Amounts")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                         
-                        HStack(spacing: 8) {
-                            ForEach(recentAmounts.prefix(3), id: \.self) { amount in
-                                AnimatedButton(hapticStyle: .light) {
-                                    addWater(amount: amount)
-                                } label: {
-                                    Text("+\(Int(amount))ml")
-                                        .font(.subheadline)
-                                        .foregroundColor(.white)
-                                        .frame(maxWidth: .infinity)
-                                        .padding(.vertical, 10)
-                                        .background(Color.blue.opacity(0.7))
-                                        .cornerRadius(8)
-                                }
+                        AnimatedButton(hapticStyle: .light) {
+                            showQuickActionsMenu()
+                        } label: {
+                            HStack {
+                                Image(systemName: "ellipsis.circle.fill")
+                                Text("More")
                             }
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(Color.secondary.opacity(0.5), lineWidth: 1.5)
+                            )
                         }
                     }
-                    .padding(.horizontal)
-                    .padding(.top, 5)
-                }
-                
-                AnimatedButton(hapticStyle: .light) {
-                    showingCustomInput = true
-                } label: {
-                    Text("Custom Amount")
-                        .font(.headline)
-                        .foregroundColor(.blue)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 10)
-                                .stroke(Color.blue, lineWidth: 2)
-                        )
                 }
                 .padding(.horizontal)
+                .padding(.top, 8)
+                
+                // Smart Time-Based Suggestion Banner
+                if shouldShowSuggestion {
+                    let currentHour = Calendar.current.component(.hour, from: Date())
+                    let suggestionMessage = UsageTracker.shared.getTimeBasedSuggestionMessage(hour: currentHour)
+                    let suggestedAmount = UsageTracker.shared.getSuggestedAmount(
+                        currentIntake: totalIntake,
+                        dailyGoal: dailyGoal,
+                        hour: currentHour
+                    )
+                    
+                    HStack {
+                        Image(systemName: "lightbulb.fill")
+                            .foregroundColor(.orange)
+                        Text(suggestionMessage)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Button {
+                            addWater(amount: suggestedAmount)
+                            dismissSuggestion()
+                        } label: {
+                            Text("Add \(Int(suggestedAmount))ml")
+                                .font(.caption)
+                                .bold()
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.orange.opacity(0.1))
+                    .cornerRadius(10)
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                }
+                
+                // Today's Intake Timeline
+                if !todayIntakes.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Today's Entries")
+                                .font(.headline)
+                            Spacer()
+                            Text("\(todayIntakes.count) entries")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.horizontal)
+                        
+                        ForEach(todayIntakes.sorted(by: { $0.timestamp > $1.timestamp }), id: \.id) { intake in
+                            IntakeTimelineRow(
+                                intake: intake,
+                                onDelete: { deleteIntakeEntry(intake) },
+                                formatAmount: formatAmount
+                            )
+                        }
+                    }
+                    .padding(.top, 20)
+                }
                 
                 // Add bottom padding for landscape mode
                 Spacer()
@@ -371,6 +347,11 @@ struct DailyTrackingView: View {
                 UserDefaults.standard.set(Date(), forKey: "lastGoalCelebrationReset")
             } else if UserDefaults.standard.object(forKey: "lastGoalCelebrationReset") == nil {
                 UserDefaults.standard.set(Date(), forKey: "lastGoalCelebrationReset")
+            }
+            
+            // Reset suggestion dismissal if cooldown has passed
+            if let dismissedUntil = suggestionDismissedUntil, Date() >= dismissedUntil {
+                suggestionDismissedUntil = nil
             }
             
             // Handle pending water intake from widget/shortcuts
@@ -479,6 +460,25 @@ struct DailyTrackingView: View {
         return nil
     }
     
+    /// Determines if suggestion banner should be shown
+    private var shouldShowSuggestion: Bool {
+        // Don't show if close to goal
+        guard totalIntake < dailyGoal * 0.9 else { return false }
+        
+        // Check if suggestion was dismissed and cooldown hasn't passed
+        if let dismissedUntil = suggestionDismissedUntil {
+            return Date() >= dismissedUntil
+        }
+        
+        return true
+    }
+    
+    /// Dismisses the suggestion banner for a cooldown period
+    private func dismissSuggestion() {
+        let cooldownDate = Calendar.current.date(byAdding: .hour, value: Int(suggestionCooldownHours), to: Date()) ?? Date()
+        suggestionDismissedUntil = cooldownDate
+    }
+    
     private func addWater(amount: Double) {
         // Check if amount is valid
         guard amount > 0 && amount.isFinite else {
@@ -506,6 +506,9 @@ struct DailyTrackingView: View {
             return
         }
         
+        // Dismiss suggestion when user adds water manually
+        dismissSuggestion()
+        
         // Check if goal will be reached
         let goalJustReached = previousTotal < dailyGoal && newTotalAfterAdd >= dailyGoal
         
@@ -524,6 +527,13 @@ struct DailyTrackingView: View {
             
             Task {
                 await WaterIntake.updateSharedDefaults(context: modelContext)
+                
+                // Save to HealthKit if authorized
+                HealthKitManager.shared.getAuthorizationStatus { isAuthorized in
+                    if isAuthorized {
+                        HealthKitManager.shared.saveWaterIntake(amount)
+                    }
+                }
                 
                 // Always check achievements after adding water
                 await checkAndUnlockAchievements()
@@ -575,6 +585,31 @@ struct DailyTrackingView: View {
         } catch {
             print("Error saving water intake: \(error.localizedDescription)")
             lastActionIntake = nil
+        }
+    }
+    
+    /// Deletes a specific intake entry
+    private func deleteIntakeEntry(_ intake: WaterIntake) {
+        modelContext.delete(intake)
+        do {
+            try modelContext.save()
+            HapticManager.shared.success()
+            
+            Task {
+                await WaterIntake.updateSharedDefaults(context: modelContext)
+                await checkAndUnlockAchievements()
+                await MainActor.run {
+                    let streak = StreakManager.shared.calculateCurrentStreak(
+                        intakes: Array(allIntakes),
+                        dailyGoal: dailyGoal,
+                        context: modelContext
+                    )
+                    currentStreak = streak
+                }
+            }
+        } catch {
+            print("Error deleting intake: \(error.localizedDescription)")
+            HapticManager.shared.error()
         }
     }
     

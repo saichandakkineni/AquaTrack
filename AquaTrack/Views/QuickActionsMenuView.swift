@@ -5,8 +5,23 @@ struct QuickActionsMenuView: View {
     let recentAmounts: [Double]
     let suggestedAmount: Double
     let onAdd: (Double) -> Void
+    let onDecrease: ((Double) -> Void)?
     
     @Environment(\.dismiss) private var dismiss
+    
+    init(
+        mostUsedAmount: Double?,
+        recentAmounts: [Double],
+        suggestedAmount: Double,
+        onAdd: @escaping (Double) -> Void,
+        onDecrease: ((Double) -> Void)? = nil
+    ) {
+        self.mostUsedAmount = mostUsedAmount
+        self.recentAmounts = recentAmounts
+        self.suggestedAmount = suggestedAmount
+        self.onAdd = onAdd
+        self.onDecrease = onDecrease
+    }
     
     var body: some View {
         NavigationStack {
@@ -15,6 +30,7 @@ struct QuickActionsMenuView: View {
                     Section("Most Used") {
                         Button {
                             onAdd(mostUsed)
+                            dismiss()
                         } label: {
                             HStack {
                                 Image(systemName: "star.fill")
@@ -29,9 +45,10 @@ struct QuickActionsMenuView: View {
                     }
                 }
                 
-                Section("Suggested") {
+                Section("Smart Suggestions") {
                     Button {
                         onAdd(suggestedAmount)
+                        dismiss()
                     } label: {
                         HStack {
                             Image(systemName: "lightbulb.fill")
@@ -39,7 +56,7 @@ struct QuickActionsMenuView: View {
                             Text("\(Int(suggestedAmount))ml")
                                 .font(.headline)
                             Spacer()
-                            Text("Based on time & progress")
+                            Text("Time-based")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             Image(systemName: "plus.circle.fill")
@@ -49,10 +66,11 @@ struct QuickActionsMenuView: View {
                 }
                 
                 if !recentAmounts.isEmpty {
-                    Section("Recent") {
+                    Section("Recent Amounts") {
                         ForEach(recentAmounts, id: \.self) { amount in
                             Button {
                                 onAdd(amount)
+                                dismiss()
                             } label: {
                                 HStack {
                                     Text("\(Int(amount))ml")
@@ -65,10 +83,11 @@ struct QuickActionsMenuView: View {
                     }
                 }
                 
-                Section("Quick Add") {
-                    ForEach([100.0, 250.0, 500.0, 750.0], id: \.self) { amount in
+                Section("Small Amounts") {
+                    ForEach([25.0, 50.0, 100.0], id: \.self) { amount in
                         Button {
                             onAdd(amount)
+                            dismiss()
                         } label: {
                             HStack {
                                 Text("\(Int(amount))ml")
@@ -79,12 +98,46 @@ struct QuickActionsMenuView: View {
                         }
                     }
                 }
+                
+                Section("Standard Amounts") {
+                    ForEach([250.0, 500.0, 750.0], id: \.self) { amount in
+                        Button {
+                            onAdd(amount)
+                            dismiss()
+                        } label: {
+                            HStack {
+                                Text("\(Int(amount))ml")
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+                
+                if let onDecrease = onDecrease {
+                    Section("Decrease Intake") {
+                        ForEach([100.0, 250.0, 500.0], id: \.self) { amount in
+                            Button(role: .destructive) {
+                                onDecrease(amount)
+                                dismiss()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "minus.circle.fill")
+                                        .foregroundColor(.red)
+                                    Text("\(Int(amount))ml")
+                                    Spacer()
+                                }
+                            }
+                        }
+                    }
+                }
             }
             .navigationTitle("Quick Actions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button("Done") {
                         dismiss()
                     }
                 }

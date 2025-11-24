@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+import UIKit
 
 struct SettingsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -13,6 +14,9 @@ struct SettingsView: View {
     @State private var quietHoursEnabled: Bool = true
     @State private var quietHoursStart: Int = 22 // 10 PM
     @State private var quietHoursEnd: Int = 7    // 7 AM
+    @State private var showingPermissionDeniedAlert = false
+    @State private var healthKitAuthorized: Bool = false
+    @State private var checkingHealthKitStatus: Bool = false
     
     private var currentSettings: Settings {
         if let first = settings.first {
@@ -64,7 +68,7 @@ struct SettingsView: View {
                     Toggle("Enable Reminders", isOn: $reminderEnabled)
                         .onChange(of: reminderEnabled) { _, newValue in
                             if newValue {
-                                requestNotificationPermission()
+                                checkAndRequestNotificationPermission()
                             } else {
                                 updateReminderSettings(enabled: false)
                                 UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
@@ -138,8 +142,33 @@ struct SettingsView: View {
                 }
                 
                 Section("Health Integration") {
-                    Button("Connect to Health App") {
-                        showingHealthKitAuth = true
+                    if checkingHealthKitStatus {
+                        HStack {
+                            Text("Checking connection status...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        }
+                    } else if healthKitAuthorized {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Health App")
+                                    .font(.body)
+                                Text("Connected")
+                                    .font(.caption)
+                                    .foregroundColor(.green)
+                            }
+                            Spacer()
+                            Button("Manage") {
+                                showingHealthKitAuth = true
+                            }
+                        }
+                    } else {
+                        Button("Connect to Health App") {
+                            showingHealthKitAuth = true
+                        }
                     }
                 }
             }
@@ -147,15 +176,38 @@ struct SettingsView: View {
             .sheet(isPresented: $showingHealthKitAuth) {
                 HealthKitAuthView()
             }
+            .onChange(of: showingHealthKitAuth) { _, isShowing in
+                // When sheet is dismissed, refresh HealthKit status
+                if !isShowing {
+                    checkHealthKitStatus()
+                }
+            }
+            .alert("Notification Permission Required", isPresented: $showingPermissionDeniedAlert) {
+                Button("Settings") {
+                    if let settingsUrl = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(settingsUrl)
+                    }
+                }
+                Button("Cancel", role: .cancel) {
+                    reminderEnabled = false
+                }
+            } message: {
+                Text("Please enable notifications in Settings to receive water intake reminders.")
+            }
             .onAppear {
                 // Initialize all state from current settings
                 dailyGoal = currentSettings.dailyGoal
-                reminderEnabled = currentSettings.reminderEnabled
                 reminderInterval = currentSettings.reminderInterval
                 selectedUnit = currentSettings.unit
                 quietHoursEnabled = currentSettings.quietHoursEnabled
                 quietHoursStart = currentSettings.quietHoursStart
                 quietHoursEnd = currentSettings.quietHoursEnd
+                
+                // Check notification permission status and sync with toggle
+                checkNotificationPermissionStatus()
+                
+                // Check HealthKit authorization status
+                checkHealthKitStatus()
             }
         }
     }
@@ -184,20 +236,58 @@ struct SettingsView: View {
         try? modelContext.save()
     }
     
-    private func requestNotificationPermission() {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, _ in
+    private func checkNotificationPermissionStatus() {
+        // Check current permission status and sync toggle state
+        UNUserNotificationCenter.current().getNotificationSettings { settings in
+            DispatchQueue.main.async {
+                let isAuthorized = settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional
+                // Only update if there's a mismatch - don't override user's current toggle if they just turned it off
+                if self.currentSettings.reminderEnabled != isAuthorized {
+                    self.reminderEnabled = isAuthorized
+                    self.currentSettings.reminderEnabled = isAuthorized
+                    try? self.modelContext.save()
+                    
+                    if isAuthorized {
+                        // Permission is granted, schedule notifications
+                        self.scheduleNotifications()
+                    }
+                } else {
+                    // Sync the state variable
+                    self.reminderEnabled = self.currentSettings.reminderEnabled
+                }
+            }
+        }
+    }
+    
+    private func checkAndRequestNotificationPermission() {
+        // Always try to request permission first - iOS will show the dialog if permission hasn't been determined
+        // If permission was previously denied, iOS won't show the dialog, so we'll check status after
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
             DispatchQueue.main.async {
                 if granted {
-                    updateReminderSettings(enabled: true)
-                    // Schedule with current quiet hours settings
+                    // Permission granted, enable reminders
+                    self.updateReminderSettings(enabled: true)
                     NotificationManager.shared.scheduleNotifications(
-                        interval: reminderInterval,
-                        quietHoursEnabled: quietHoursEnabled,
-                        quietHoursStart: quietHoursStart,
-                        quietHoursEnd: quietHoursEnd
+                        interval: self.reminderInterval,
+                        quietHoursEnabled: self.quietHoursEnabled,
+                        quietHoursStart: self.quietHoursStart,
+                        quietHoursEnd: self.quietHoursEnd
                     )
                 } else {
-                    updateReminderSettings(enabled: false)
+                    // Permission not granted - check if it's because it was previously denied
+                    // If so, we need to direct user to Settings
+                    UNUserNotificationCenter.current().getNotificationSettings { settings in
+                        DispatchQueue.main.async {
+                            if settings.authorizationStatus == .denied {
+                                // Permission was previously denied, need to go to Settings
+                                self.reminderEnabled = false
+                                self.showingPermissionDeniedAlert = true
+                            } else {
+                                // User just denied it now, or some other error
+                                self.reminderEnabled = false
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -214,5 +304,15 @@ struct SettingsView: View {
     private func formatDailyGoal() -> String {
         let goalInSelectedUnit = WaterUnit.convert(dailyGoal, from: .milliliters, to: selectedUnit)
         return "\(selectedUnit.format(goalInSelectedUnit)) \(selectedUnit.displayName)"
+    }
+    
+    private func checkHealthKitStatus() {
+        checkingHealthKitStatus = true
+        HealthKitManager.shared.getAuthorizationStatus { isAuthorized in
+            DispatchQueue.main.async {
+                self.healthKitAuthorized = isAuthorized
+                self.checkingHealthKitStatus = false
+            }
+        }
     }
 } 

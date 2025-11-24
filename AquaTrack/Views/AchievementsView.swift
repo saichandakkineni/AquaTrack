@@ -76,10 +76,12 @@ struct AchievementsView: View {
                             GridItem(.flexible())
                         ], spacing: 16) {
                             ForEach(allAchievementDefinitions, id: \.id) { definition in
+                                let progress = getAchievementProgress(for: definition)
                                 AchievementCard(
                                     definition: definition,
                                     isEarned: earnedAchievementIds.contains(definition.id),
-                                    earnedDate: earnedAchievements.first { $0.id == definition.id }?.earnedDate
+                                    earnedDate: earnedAchievements.first { $0.id == definition.id }?.earnedDate,
+                                    currentProgress: progress
                                 )
                                 .onTapGesture {
                                     if earnedAchievementIds.contains(definition.id) {
@@ -165,6 +167,27 @@ struct AchievementsView: View {
             }
         }
     }
+    
+    /// Gets progress for an achievement
+    private func getAchievementProgress(for definition: AchievementDefinition) -> (current: Int, total: Int)? {
+        let achievementManager = AchievementManager.shared
+        
+        switch definition.category {
+        case .streak:
+            return (current: currentStreak, total: definition.requirement)
+        case .goal:
+            return (current: goalCompletions, total: definition.requirement)
+        case .consistency:
+            let perfectDays = achievementManager.calculatePerfectDays(
+                intakes: Array(allIntakes),
+                dailyGoal: dailyGoal,
+                context: modelContext
+            )
+            return (current: perfectDays, total: definition.requirement)
+        case .milestone:
+            return nil
+        }
+    }
 }
 
 struct StatCard: View {
@@ -198,6 +221,19 @@ struct AchievementCard: View {
     let definition: AchievementDefinition
     let isEarned: Bool
     let earnedDate: Date?
+    let currentProgress: (current: Int, total: Int)?
+    
+    init(definition: AchievementDefinition, isEarned: Bool, earnedDate: Date?, currentProgress: (current: Int, total: Int)? = nil) {
+        self.definition = definition
+        self.isEarned = isEarned
+        self.earnedDate = earnedDate
+        self.currentProgress = currentProgress
+    }
+    
+    private var progress: Double {
+        guard let progress = currentProgress, !isEarned else { return 0 }
+        return min(Double(progress.current) / Double(progress.total), 1.0)
+    }
     
     var body: some View {
         VStack(spacing: 8) {
@@ -224,9 +260,20 @@ struct AchievementCard: View {
                 Text(date, style: .date)
                     .font(.caption2)
                     .foregroundColor(.secondary)
+            } else if let progress = currentProgress, !isEarned {
+                // Progress indicator
+                VStack(spacing: 4) {
+                    ProgressView(value: self.progress)
+                        .progressViewStyle(.linear)
+                        .tint(.blue)
+                    
+                    Text("\(progress.current)/\(progress.total)")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                }
             }
         }
-        .frame(height: 120)
+        .frame(height: 140)
         .frame(maxWidth: .infinity)
         .padding()
         .background(isEarned ? Color.yellow.opacity(0.1) : Color.gray.opacity(0.05))
